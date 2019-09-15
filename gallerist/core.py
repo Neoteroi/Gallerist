@@ -3,7 +3,7 @@ from io import BytesIO
 from dataclasses import dataclass
 from typing import BinaryIO, Sequence, Optional, Dict, List
 from gallerist.abc import ImageStore
-from PIL import Image
+from PIL import Image, ImageSequence
 
 
 def exception_str(ex):
@@ -16,30 +16,6 @@ class ImageFormat:
     name: str
     extension: str
     quality: int
-
-    def resize_to_max_side(self,
-                           image: Image,
-                           desired_max_side: int) -> Image:
-        width, height = image.size
-
-        max_side = max(width, height)
-
-        if max_side <= desired_max_side:
-            # return the same image
-            return image
-
-        if width >= height:
-            # h : 100 = w : x
-            ratio = width / desired_max_side
-            other_side = height / ratio
-            sc = (desired_max_side, int(other_side))
-        else:
-            # w : 100 = h : x
-            ratio = height / desired_max_side
-            other_side = width / ratio
-            sc = (int(other_side), desired_max_side)
-
-        return image.resize(sc, Image.ANTIALIAS)
 
     def to_bytes(self, image: Image) -> BytesIO:
         byte_io = BytesIO()
@@ -60,8 +36,15 @@ class GifFormat(ImageFormat):
         #     return super().to_bytes(image)
         byte_io = BytesIO()
 
-        # duration = image.info.get('duration', 100)
-        all_frames[0].save(byte_io, format='GIF', optimize=True, save_all=True, append_images=all_frames[1:], loop=1000)
+        # all_frames = [frame for frame in ImageSequence.Iterator(image)]
+        image = all_frames[0]
+        all_frames[0].save(byte_io,
+                           format=self.name,
+                           optimize=True,
+                           save_all=True,
+                           append_images=all_frames[1:],
+                           duration=image.info.get('duration', 100),
+                           loop=0)
         """
         image.save(byte_io,
                    self.name,
@@ -71,16 +54,6 @@ class GifFormat(ImageFormat):
                    loop=0)
         """
         return byte_io
-
-    def resize_to_max_side(self, image: Image, desired_max_side: int) -> Image:
-        all_frames = self.extract_frames(image, desired_max_side)
-
-        if len(all_frames) == 1:
-            print("Warning: only 1 frame found")
-            all_frames[0].save(save_as, optimize=True)
-        else:
-            all_frames[0].save(save_as, optimize=True, save_all=True, append_images=all_frames[1:], loop=1000)
-        # return super().resize_to_max_side(image, desired_max_side)
 
     def get_mode(self, image: Image):
         """
@@ -349,7 +322,24 @@ class Gallerist:
             other_side = width / ratio
             sc = (int(other_side), desired_max_side)
 
-        return image.resize(sc, Image.ANTIALIAS)
+        if getattr(image, 'n_frames', 1) == 1:
+            # single frame image
+            return image.resize(sc, Image.ANTIALIAS)
+
+        all_frames = [frame.resize(sc, Image.BOX) for frame in ImageSequence.Iterator(image)]
+
+        byte_io = BytesIO()
+
+        all_frames[0].save(byte_io,
+                           format='GIF',
+                           optimize=True,
+                           save_all=True,
+                           append_images=all_frames[1:],
+                           loop=0)
+
+        # return image.resize(sc, Image.ANTIALIAS)
+        byte_io.seek(0)
+        return Image.open(byte_io)
 
     def image_to_bytes(self, image: Image) -> BytesIO:
         image_format = self.format_by_mime(Image.MIME[image.format])

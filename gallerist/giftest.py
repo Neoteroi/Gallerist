@@ -1,8 +1,9 @@
+from io import BytesIO
 from math import floor, fabs
 from PIL import Image, ImageSequence
 
 
-def transform_image(original_img, crop_w, crop_h):
+def ref_transform_image(original_img, crop_w, crop_h):
     """
     Resizes and crops the image to the specified crop_w and crop_h if necessary.
     Works with multi frame gif and webp images also.
@@ -64,3 +65,59 @@ def transform_image(original_img, crop_w, crop_h):
         for frame in ImageSequence.Iterator(original_img):
             frames.append( transform_frame(frame) )
         return frames
+
+
+def resize_to_max_side(image: Image, desired_max_side: int) -> Image:
+    """
+    Resizes and crops the image to the specified crop_w and crop_h if necessary.
+    Works with multi frame gif and webp images also.
+
+    args:
+    original_img is the image instance created by pillow ( Image.open(filepath) )
+    crop_w is the width in pixels for the image that will be resized and cropped
+    crop_h is the height in pixels for the image that will be resized and cropped
+
+    returns:
+    Instance of an Image or list of frames which they are instances of an Image individually
+    """
+    width, height = image.size
+
+    max_side = max(width, height)
+
+    if max_side <= desired_max_side:
+        # return the same image, resizing is not needed
+        return image
+
+    if width >= height:
+        # h : 100 = w : x
+        ratio = width / desired_max_side
+        other_side = height / ratio
+        sc = (desired_max_side, int(other_side))
+    else:
+        # w : 100 = h : x
+        ratio = height / desired_max_side
+        other_side = width / ratio
+        sc = (int(other_side), desired_max_side)
+
+    if getattr(image, 'n_frames', 1) == 1:
+        # single frame image
+        return image.resize(sc, Image.BOX)
+
+    all_frames = [frame.resize(sc, Image.BOX) for frame in ImageSequence.Iterator(image)]
+
+    return all_frames
+    # WHY The size explodes with the following?
+    """
+    
+    byte_io = BytesIO()
+
+    all_frames[0].save(byte_io,
+                       format='GIF',
+                       optimize=True,
+                       save_all=True,
+                       append_images=all_frames[1:],
+                       loop=0)
+    
+    byte_io.seek(0)
+    return Image.open(byte_io)
+    """
