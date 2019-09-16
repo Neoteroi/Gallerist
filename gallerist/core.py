@@ -4,10 +4,39 @@ from dataclasses import dataclass
 from typing import BinaryIO, Sequence, Optional, Dict, List
 from gallerist.abc import ImageStore
 from PIL import Image, ImageSequence
+from PIL.Image import Image as ImageClass
 
 
 def exception_str(ex):
     return str(ex) or ex.__class__.__name__
+
+
+# TODO: support output as single image or a list of images
+class ImageOutput:
+
+    def __init__(self, image, frames=None):
+        self.image = image
+        self.frames = frames
+
+    @property
+    def is_animated(self):
+        return bool(self.frames)
+
+    @property
+    def info(self):
+        return self.image.info
+
+    @property
+    def format(self):
+        return self.image.format
+
+    @format.setter
+    def format(self, value):
+        self.image.format = value
+
+    @classmethod
+    def from_frames(cls, frames):
+        return cls(frames[0], frames)
 
 
 @dataclass
@@ -17,7 +46,8 @@ class ImageFormat:
     extension: str
     quality: int
 
-    def to_bytes(self, image: Image) -> BytesIO:
+    def to_bytes(self, image: ImageOutput) -> BytesIO:
+        image = image.image
         byte_io = BytesIO()
         if self.quality > 0:
             image.save(byte_io, image.format, quality=self.quality)
@@ -31,28 +61,21 @@ class GifFormat(ImageFormat):
     def __init__(self):
         super().__init__('image/gif', 'GIF', '.gif', -1)
 
-    def to_bytes(self, all_frames: Image) -> BytesIO:
-        # if not image.is_animated:
-        #     return super().to_bytes(image)
+    def to_bytes(self, image: ImageOutput) -> BytesIO:
+        # TODO: accept both a single image or a list of images as input parameter?
+
+        if not image.is_animated:
+            return super().to_bytes(image)
         byte_io = BytesIO()
 
-        # all_frames = [frame for frame in ImageSequence.Iterator(image)]
-        image = all_frames[0]
-        all_frames[0].save(byte_io,
-                           format=self.name,
-                           optimize=True,
-                           save_all=True,
-                           append_images=all_frames[1:],
-                           duration=image.info.get('duration', 100),
-                           loop=0)
-        """
-        image.save(byte_io,
-                   self.name,
-                   save_all=True,
-                   append_images=image[1:],
-                   duration=duration,
-                   loop=0)
-        """
+        image.frames[0].save(byte_io,
+                             format=self.name,
+                             optimize=True,
+                             save_all=True,
+                             append_images=image.frames[1:],
+                             duration=image.info.get('duration', 100),
+                             loop=0)
+
         return byte_io
 
     def get_mode(self, image: Image):
@@ -220,7 +243,7 @@ class Gallerist:
         '*': (ImageSize('medium', 1200),
               ImageSize('thumbnail', 200)),
         'image/gif': (ImageSize('medium', 200),
-                      ImageSize('thumbnail', 200))
+                      ImageSize('thumbnail', 100))
     }
 
     default_formats = [
@@ -302,7 +325,7 @@ class Gallerist:
 
     def resize_to_max_side(self,
                            image: Image,
-                           desired_max_side: int) -> Image:
+                           desired_max_side: int) -> ImageOutput:
         width, height = image.size
 
         max_side = max(width, height)
@@ -324,22 +347,9 @@ class Gallerist:
 
         if getattr(image, 'n_frames', 1) == 1:
             # single frame image
-            return image.resize(sc, Image.ANTIALIAS)
+            return ImageOutput(image.resize(sc, Image.ANTIALIAS))
 
-        all_frames = [frame.resize(sc, Image.BOX) for frame in ImageSequence.Iterator(image)]
-
-        byte_io = BytesIO()
-
-        all_frames[0].save(byte_io,
-                           format='GIF',
-                           optimize=True,
-                           save_all=True,
-                           append_images=all_frames[1:],
-                           loop=0)
-
-        # return image.resize(sc, Image.ANTIALIAS)
-        byte_io.seek(0)
-        return Image.open(byte_io)
+        return ImageOutput.from_frames([frame.resize(sc, Image.BOX) for frame in ImageSequence.Iterator(image)])
 
     def image_to_bytes(self, image: Image) -> BytesIO:
         image_format = self.format_by_mime(Image.MIME[image.format])
@@ -369,9 +379,9 @@ class Gallerist:
             image = self.strip_exif(image)
 
         width, height = image.size
-        versions = [ImageVersion('original', self.new_id(), max(width, height))]
+        # versions = [ImageVersion('original', self.new_id(), max(width, height))]
 
-        yield self.image_to_bytes(image)
+        yield self.image_to_bytes(ImageOutput(image))
 
         for size in self.sizes_for_mime(image_mime):
             resized_image = self.resize_to_max_side(image, size.resize_to)
