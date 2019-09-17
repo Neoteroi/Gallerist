@@ -23,16 +23,17 @@ class NoopStore(ImageStore):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('file_path,file_name_fn', [
-    # ['files/01.png', lambda i: f'png_{i}.png'],
-    ['files/01.gif', lambda i: f'zgif_{i}.gif']
+@pytest.mark.parametrize('file_path,file_name_fn,image_format', [
+    ['files/pexels-photo-126407.jpeg', lambda i: f'jpg_{i}.jpg', 'JPEG'],
+    ['files/png_01.png', lambda i: f'png_{i}.png', 'PNG'],
+    ['files/01.gif', lambda i: f'gif_{i}.gif', 'GIF']
 ])
-async def test_prepare_for_web(file_path, file_name_fn):
+async def test_prepare_for_web(file_path, file_name_fn, image_format):
     gallerist = Gallerist(NoopStore())
 
     with open(file_path, 'rb') as file:
         i = 0
-        for version, image in gallerist.prepare_images(file):
+        for version, image in gallerist.prepare_images(file, image_format):
             i += 1
             with open(os.path.join('out', file_name_fn(i)), 'wb') as ff:
                 ff.write(image)
