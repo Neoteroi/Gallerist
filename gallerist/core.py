@@ -1,7 +1,7 @@
 import uuid
 from io import BytesIO
 from dataclasses import dataclass
-from typing import BinaryIO, Sequence, Optional, Dict, List, Tuple
+from typing import BinaryIO, Sequence, Optional, Dict, List, Generator, Tuple
 from gallerist.abc import ImageStore
 from PIL import Image, ImageSequence
 
@@ -20,6 +20,9 @@ class ImageWrapper:
 
     @property
     def n_frames(self):
+        if self.frames:
+            return len(self.frames)
+        # frames count can be known, while actual frames are not loaded in memory
         return getattr(self.image, 'n_frames', 1)
 
     @property
@@ -53,14 +56,15 @@ class ImageFormat:
     extension: str
     quality: int
 
-    def to_bytes(self, wrapper: ImageWrapper) -> BytesIO:
+    def to_bytes(self, wrapper: ImageWrapper) -> bytes:
         image = wrapper.image
         byte_io = BytesIO()
         if self.quality > 0:
             image.save(byte_io, image.format, quality=self.quality)
         else:
             image.save(byte_io, image.format)
-        return byte_io
+        byte_io.seek(0)
+        return byte_io.read()
 
 
 class GifFormat(ImageFormat):
@@ -68,7 +72,7 @@ class GifFormat(ImageFormat):
     def __init__(self):
         super().__init__('image/gif', 'GIF', '.gif', -1)
 
-    def to_bytes(self, wrapper: ImageWrapper) -> BytesIO:
+    def to_bytes(self, wrapper: ImageWrapper) -> bytes:
         if wrapper.n_frames == 1:
             return super().to_bytes(wrapper)
         byte_io = BytesIO()
@@ -83,72 +87,8 @@ class GifFormat(ImageFormat):
                                append_images=wrapper.frames[1:],
                                duration=wrapper.info.get('duration', 100),
                                loop=0)
-
-        return byte_io
-
-    def get_mode(self, image: Image):
-        """
-        Pre-process pass over the image to determine the mode (full or additive).
-        Necessary as assessing single frames isn't reliable. Need to know the mode
-        before processing all frames.
-        """
-        try:
-            while True:
-                if image.tile:
-                    tile = image.tile[0]
-                    update_region = tile[1]
-                    update_region_dimensions = update_region[2:]
-                    if update_region_dimensions != image.size:
-                        return 'partial'
-                image.seek(image.tell() + 1)
-        except EOFError:
-            pass
-        return 'full'
-
-    def extract_frames(self, image: Image, resize_to: int = -1):
-        """
-        Iterate the GIF, extracting each frame and resizing them
-
-        Returns:
-            An array of all frames
-        """
-        mode = self.get_mode(image)
-
-        palette = image.getpalette()
-        last_frame = image.convert('RGBA')
-
-        all_frames = []
-
-        try:
-            while True:
-                """
-                If the GIF uses local colour tables, each frame will have its own palette.
-                If not, we need to apply the global palette to the new frame.
-                """
-                if not image.getpalette():
-                    image.putpalette(palette)
-
-                new_frame = Image.new('RGBA', image.size)
-
-                """
-                Is this file a "partial"-mode GIF where frames update a region of a different size to the entire image?
-                If so, we need to construct the new frame by pasting it on top of the preceding frames.
-                """
-                if mode == 'partial':
-                    new_frame.paste(last_frame)
-
-                new_frame.paste(image, (0, 0), image.convert('RGBA'))
-
-                if resize_to > 0:
-                    new_frame.thumbnail(resize_to, Image.ANTIALIAS)
-                all_frames.append(new_frame)
-
-                last_frame = new_frame
-                image.seek(image.tell() + 1)
-        except EOFError:
-            pass
-
-        return all_frames
+        byte_io.seek(0)
+        return byte_io.read()
 
 
 @dataclass
@@ -164,7 +104,7 @@ ImageSizesType = Dict[str, Sequence[ImageSize]]
 
 @dataclass
 class ImageVersion:
-    name: str
+    size_name: str
     id: str
     max_side: int
 
@@ -233,6 +173,30 @@ class ImageResizingException(GalleristError):
         self.data = available_data
 
 
+class JpegFormat(ImageFormat):
+
+    def __init__(self):
+        super().__init__('image/jpeg', 'JPEG', '.jpg', 80)
+
+
+class PJpegFormat(ImageFormat):
+
+    def __init__(self):
+        super().__init__('image/pjpeg', 'JPEG', '.jpg', 80)
+
+
+class PngFormat(ImageFormat):
+
+    def __init__(self):
+        super().__init__('image/png', 'PNG', '.png', -1)
+
+
+class MpoFormat(ImageFormat):
+
+    def __init__(self):
+        super().__init__('image/mpo', 'JPEG', '.jpg', 80)
+
+
 class Gallerist:
     """Provides methods to prepare images in various sizes and store them with metadata."""
 
@@ -251,15 +215,15 @@ class Gallerist:
         '*': (ImageSize('medium', 1200),
               ImageSize('thumbnail', 200)),
         'image/gif': (ImageSize('medium', 200),
-                      ImageSize('thumbnail', 100))
+                      ImageSize('thumbnail', 120))
     }
 
     default_formats = [
-        ImageFormat('image/jpeg', 'JPEG', '.jpg', 80),
-        ImageFormat('image/pjpeg', 'JPEG', '.jpg', 80),
-        ImageFormat('image/png', 'PNG', '.png', -1),
+        JpegFormat(),
+        PJpegFormat(),
+        PngFormat(),
         GifFormat(),
-        ImageFormat('image/mpo', 'JPEG', '.jpg', 80)
+        MpoFormat()
     ]
 
     @property
@@ -359,21 +323,35 @@ class Gallerist:
 
         return ImageWrapper.from_frames([frame.resize(sc, Image.BOX) for frame in ImageSequence.Iterator(image)])
 
-    def image_to_bytes(self, wrapper: ImageWrapper) -> BytesIO:
+    def image_to_bytes(self, wrapper: ImageWrapper) -> bytes:
         image_format = self.format_by_mime(Image.MIME[wrapper.format])
-        byte_io = image_format.to_bytes(wrapper)
-        byte_io.seek(0)
-        return byte_io
+        return image_format.to_bytes(wrapper)
 
-    async def upload_image(self, stream: BinaryIO):
+    async def process_image(self, image_path: str):
+        # TODO: see input in ASWE, how to make it abstract
+        # TODO: support container name input?
 
-        for image in self.prepare_images(stream):
-            # upload image;
-            await self.store.store_image()
+        # 1. Load an original image from a source
+        stream = await self.store.read_file(image_path)
 
-    def prepare_images(self, stream: BinaryIO):
+        # TODO: handle not found
+
+        # 2. Prepare images in various sizes, depending on configuration
+        # TODO: how to make this in an executor?
+        for version, prepared_image in self.prepare_images(stream):
+            # 3. Store prepared images in the target source
+            await self.store.write_file("TODO!", prepared_image)
+
+            # TODO: select a location for the generated file; this must come from a strategy (NamingStrategy ?)
+
+        # 4. Store metadata about the image (width, height, ratio, extension, mime, bytes size, etc.)
+        # 5. Return metadata
+        pass
+
+    def prepare_images(self, stream: BinaryIO) -> Generator[Tuple[ImageVersion, bytes], None, None]:
         """
-        Prepares an image in various sizes, depending on configured sizes by mime type.
+        Prepares an image in various sizes, starting from an original image and
+        depending on configured sizes by mime type.
 
         :param stream: binary stream representing an image.
         """
@@ -386,14 +364,18 @@ class Gallerist:
         if self.remove_exif:
             image = self.strip_exif(image)
 
+        # versions = []
+
         for size in self.sizes_for_mime(image_mime):
-            # TODO: avoid generating twice an image with the same or smaller size than a previous one
             resized_image = self.resize_to_max_side(image, size.resize_to)
             resized_image.format = image_format
+            version = ImageVersion(size.name, self.new_id(), size.resize_to)
+            # versions.append(version)
 
-            yield self.image_to_bytes(resized_image)
+            yield version, self.image_to_bytes(resized_image)
 
-    def get_image_metadata(self):
+    def foo():
+        # TODO: not nice?
         width, height = image.size
         options = self.format_by_mime(image_mime)
         # if storing image bytes, why not metadata as well?
@@ -402,4 +384,6 @@ class Gallerist:
                              width / height,
                              options.extension,
                              image_mime,
-                             versions=[])
+                             versions=versions)
+
+
