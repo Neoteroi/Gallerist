@@ -333,14 +333,14 @@ class Gallerist:
 
     def resize_to_max_side(self,
                            image: Image,
-                           desired_max_side: int) -> Tuple[bool, ImageWrapper]:
+                           desired_max_side: int) -> ImageWrapper:
         width, height = image.size
 
         max_side = max(width, height)
 
         if max_side <= desired_max_side:
             # return the same image
-            return True, ImageWrapper(image)
+            return ImageWrapper(image)
 
         if width >= height:
             # h : 100 = w : x
@@ -355,9 +355,9 @@ class Gallerist:
 
         if getattr(image, 'n_frames', 1) == 1:
             # single frame image
-            return False, ImageWrapper(image.resize(sc, Image.ANTIALIAS))
+            return ImageWrapper(image.resize(sc, Image.ANTIALIAS))
 
-        return False, ImageWrapper.from_frames([frame.resize(sc, Image.BOX) for frame in ImageSequence.Iterator(image)])
+        return ImageWrapper.from_frames([frame.resize(sc, Image.BOX) for frame in ImageSequence.Iterator(image)])
 
     def image_to_bytes(self, wrapper: ImageWrapper) -> BytesIO:
         image_format = self.format_by_mime(Image.MIME[wrapper.format])
@@ -386,19 +386,12 @@ class Gallerist:
         if self.remove_exif:
             image = self.strip_exif(image)
 
-        # width, height = image.size
-        # versions = [ImageVersion('original', self.new_id(), max(width, height))]
-
-        yield self.image_to_bytes(ImageWrapper(image))
-
         for size in self.sizes_for_mime(image_mime):
             # TODO: avoid generating twice an image with the same or smaller size than a previous one
-            is_same_image, resized_image = self.resize_to_max_side(image, size.resize_to)
+            resized_image = self.resize_to_max_side(image, size.resize_to)
             resized_image.format = image_format
 
-            if not is_same_image:
-                # TODO: store the image;
-                yield self.image_to_bytes(resized_image)
+            yield self.image_to_bytes(resized_image)
 
     def get_image_metadata(self):
         width, height = image.size
