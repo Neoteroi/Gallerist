@@ -1,13 +1,13 @@
 import os
 import pytest
 from typing import BinaryIO
-from gallerist.core import Gallerist, ImageStore
+from gallerist.core import Gallerist, FileStore
 
 
 os.makedirs('out', exist_ok=True)
 
 
-class NoopStore(ImageStore):
+class NoopStore(FileStore):
 
     async def store_picture_metadata(self):
         pass

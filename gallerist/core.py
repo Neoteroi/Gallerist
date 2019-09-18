@@ -2,7 +2,7 @@ import uuid
 from io import BytesIO
 from dataclasses import dataclass
 from typing import BinaryIO, Sequence, Optional, Dict, List, Generator, Tuple
-from gallerist.abc import ImageStore
+from gallerist.abc import FileStoreType, FileStore, SyncFileStore
 from PIL import Image, ImageSequence
 
 
@@ -197,11 +197,35 @@ class MpoFormat(ImageFormat):
         super().__init__('image/mpo', 'JPEG', '.jpg', 80)
 
 
+class InvalidStoreTypeError(GalleristError):
+    """Base class for errors related to invalid store configuration."""
+
+
+class ExpectedSyncStoreError(InvalidStoreTypeError):
+
+    def __init__(self):
+        super().__init__(f'A synchronous file store, inheriting {SyncFileStore.__name__}, is required to '
+                         f'run the synchronous `process_image`')
+
+
+class ExpectedAsyncStoreError(InvalidStoreTypeError):
+
+    def __init__(self):
+        super().__init__(f'An asynchronous file store, inheriting {FileStore.__name__}, is required to '
+                         f'run the asynchronous `process_image_async`')
+
+
+class SourceImageNotFoundError(GalleristError):
+
+    def __init__(self):
+        super().__init__('The source image was not found, or could not be loaded.')
+
+
 class Gallerist:
     """Provides methods to prepare images in various sizes and store them with metadata."""
 
     def __init__(self,
-                 store: ImageStore,
+                 store: FileStoreType,
                  sizes: Optional[ImageSizesType] = None,
                  formats: Optional[Sequence[ImageFormat]] = None,
                  remove_exif: bool = False):
@@ -281,6 +305,7 @@ class Gallerist:
         return img
 
     def strip_exif(self, image: Image) -> Image:
+        # TODO: is this right?
         image_without_exif = Image.new(image.mode, image.size)
         image_without_exif.putdata(list(image.getdata()))
         image_without_exif.format = image.format
@@ -327,14 +352,23 @@ class Gallerist:
         image_format = self.format_by_mime(Image.MIME[wrapper.format])
         return image_format.to_bytes(wrapper)
 
-    async def process_image(self, image_path: str):
+    def process_image(self, source_image_path: str):
+        if not isinstance(self.store, SyncFileStore):
+            raise ExpectedSyncStoreError()
+
+        raise NotImplemented()
+
+    async def process_image_async(self, source_image_path: str):
         # TODO: see input in ASWE, how to make it abstract
         # TODO: support container name input?
+        if not isinstance(self.store, FileStore):
+            raise ExpectedAsyncStoreError()
 
         # 1. Load an original image from a source
-        stream = await self.store.read_file(image_path)
+        stream = await self.store.read_file(source_image_path)
 
-        # TODO: handle not found
+        if stream is None:
+            raise SourceImageNotFoundError()
 
         # 2. Prepare images in various sizes, depending on configuration
         # TODO: how to make this in an executor?
@@ -348,6 +382,18 @@ class Gallerist:
         # 5. Return metadata
         pass
 
+    def get_versions(self, image_mime: str):
+        for size in self.sizes_for_mime(image_mime):
+            yield ImageVersion(size.name, self.new_id(), size.resize_to)
+
+    def parse_image(self, stream: BinaryIO) -> Image:
+        image = Image.open(stream)
+        image = self._verify_mode_and_rotation(image)
+        # TODO: handle images without format
+        image_format = image.format
+        image_mime = Image.MIME[image_format]
+
+    # OBSOLETE!
     def prepare_images(self, stream: BinaryIO) -> Generator[Tuple[ImageVersion, bytes], None, None]:
         """
         Prepares an image in various sizes, starting from an original image and
@@ -369,6 +415,7 @@ class Gallerist:
         for size in self.sizes_for_mime(image_mime):
             resized_image = self.resize_to_max_side(image, size.resize_to)
             resized_image.format = image_format
+            # TODO: yield the version!! :)
             version = ImageVersion(size.name, self.new_id(), size.resize_to)
             # versions.append(version)
 

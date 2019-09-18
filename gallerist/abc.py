@@ -3,6 +3,7 @@ from typing import BinaryIO, Union
 
 
 class FileStore(ABC):
+    """A store that operates on files asynchronously."""
 
     @abstractmethod
     async def read_file(self, file_path: str) -> BinaryIO:
@@ -18,6 +19,7 @@ class FileStore(ABC):
 
 
 class SyncFileStore(ABC):
+    """A store that operates on files synchronously."""
 
     @abstractmethod
     def read_file(self, file_path: str) -> BinaryIO:
@@ -32,7 +34,7 @@ class SyncFileStore(ABC):
         """Deletes a file"""
 
 
-FileStoreType = Union[FileStore, SyncFileStore]  # go down this path, to offer both a sync and an async API?
+FileStoreType = Union[FileStore, SyncFileStore]
 
 
 class ImageStore(FileStore):
