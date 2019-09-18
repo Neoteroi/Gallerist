@@ -146,6 +146,12 @@ class GalleristError(Exception):
     """Base class for exceptions risen by Gallerist class"""
 
 
+class MissingImageFormatError(GalleristError):
+
+    def __init__(self):
+        super().__init__('Cannot determine image format, please specify it.')
+
+
 class SizesNotConfiguredForMimeError(GalleristError):
 
     def __init__(self, image_mime: str):
@@ -404,8 +410,10 @@ class Gallerist:
         image = Image.open(stream)
         image = self._verify_mode_and_rotation(image)
 
-        image_format = image.format
-        image_mime = Image.MIME[image_format]
+        if not image_format and not image.format:
+            raise MissingImageFormatError()
+
+        image_mime = Image.MIME[image_format or image.format]
 
         if self.remove_exif:
             image = self.strip_exif(image)
