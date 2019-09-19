@@ -107,3 +107,6 @@ venv.bak/
 
 *.orig
 */out/**
+
+*,cover
+tests/dump/*

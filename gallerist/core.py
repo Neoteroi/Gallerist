@@ -1,15 +1,21 @@
+import os
 import uuid
 import asyncio
 from io import BytesIO
 from asyncio import AbstractEventLoop
 from dataclasses import dataclass
-from typing import BinaryIO, Sequence, Optional, Dict, List, Generator
+from typing import Sequence, Optional, Dict, List, Generator
 from gallerist.abc import FileStoreType, FileStore, SyncFileStore
 from PIL import Image, ImageSequence
 
 
 def exception_str(ex):
     return str(ex) or ex.__class__.__name__
+
+
+def get_file_extension(file_path):
+    _, file_extension = os.path.splitext(file_path)
+    return file_extension
 
 
 class ImageWrapper:
@@ -58,7 +64,7 @@ class ImageFormat:
     extension: str
     quality: int
 
-    def to_bytes(self, wrapper: ImageWrapper) -> BytesIO:
+    def to_bytes(self, wrapper: ImageWrapper) -> bytes:
         image = wrapper.image
         byte_io = BytesIO()
         if self.quality > 0:
@@ -66,7 +72,31 @@ class ImageFormat:
         else:
             image.save(byte_io, image.format)
         byte_io.seek(0)
-        return byte_io
+        return byte_io.read()
+
+
+class JpegFormat(ImageFormat):
+
+    def __init__(self):
+        super().__init__('image/jpeg', 'JPEG', '.jpg', 80)
+
+
+class PJpegFormat(ImageFormat):
+
+    def __init__(self):
+        super().__init__('image/pjpeg', 'JPEG', '.jpg', 80)
+
+
+class PngFormat(ImageFormat):
+
+    def __init__(self):
+        super().__init__('image/png', 'PNG', '.png', -1)
+
+
+class MpoFormat(ImageFormat):
+
+    def __init__(self):
+        super().__init__('image/mpo', 'JPEG', '.jpg', 80)
 
 
 class GifFormat(ImageFormat):
@@ -74,7 +104,7 @@ class GifFormat(ImageFormat):
     def __init__(self):
         super().__init__('image/gif', 'GIF', '.gif', -1)
 
-    def to_bytes(self, wrapper: ImageWrapper) -> BytesIO:
+    def to_bytes(self, wrapper: ImageWrapper) -> bytes:
         if wrapper.n_frames == 1:
             return super().to_bytes(wrapper)
         byte_io = BytesIO()
@@ -90,7 +120,7 @@ class GifFormat(ImageFormat):
                                duration=wrapper.info.get('duration', 100),
                                loop=0)
         byte_io.seek(0)
-        return byte_io
+        return byte_io.read()
 
 
 @dataclass
@@ -190,30 +220,6 @@ class ImageResizingException(GalleristError):
         self.data = available_data
 
 
-class JpegFormat(ImageFormat):
-
-    def __init__(self):
-        super().__init__('image/jpeg', 'JPEG', '.jpg', 80)
-
-
-class PJpegFormat(ImageFormat):
-
-    def __init__(self):
-        super().__init__('image/pjpeg', 'JPEG', '.jpg', 80)
-
-
-class PngFormat(ImageFormat):
-
-    def __init__(self):
-        super().__init__('image/png', 'PNG', '.png', -1)
-
-
-class MpoFormat(ImageFormat):
-
-    def __init__(self):
-        super().__init__('image/mpo', 'JPEG', '.jpg', 80)
-
-
 class InvalidStoreTypeError(GalleristError):
     """Base class for errors related to invalid store configuration."""
 
@@ -292,6 +298,8 @@ class Gallerist:
 
         if not image_format:
             raise MissingImageFormatError()
+
+        image_format = image_format.upper()
 
         for handled_format in self.formats:
             if handled_format.name == image_format:
@@ -378,24 +386,19 @@ class Gallerist:
 
         return ImageWrapper.from_frames([frame.resize(sc, Image.BOX) for frame in ImageSequence.Iterator(image)])
 
-    def process_image(self,
-                      source_image_path: str,
-                      format_name: Optional[str] = None):
+    def process_image(self, source_image_path: str):
         if not isinstance(self.store, SyncFileStore):
             raise ExpectedSyncStoreError()
 
-        stream = self.store.read_file(source_image_path)
+        data = self.store.read_file(source_image_path)
 
-        if stream is None:
+        if data is None:
             raise SourceImageNotFoundError()
 
-        try:
-            image = self.parse_image(stream)
-            image_format = self.get_format(image, format_name.upper())
+        image = self.parse_image(data)
+        image_format = self.get_format(image, self.format_by_extension(source_image_path) or 'JPEG')
 
-            metadata = self._generate_images(image, image_format)
-        finally:
-            stream.close()
+        metadata = self._generate_images(image, image_format)
 
         return metadata
 
@@ -404,9 +407,19 @@ class Gallerist:
                        image_format: ImageFormat):
         return f'{version.size_name[0]}-{version.id}{image_format.extension}'
 
+    def format_by_extension(self, image_path):
+        extension = get_file_extension(image_path).lower()
+
+        if extension == '.jpg' or extension == '.jpeg':
+            return 'JPEG'
+        if extension == '.png':
+            return 'PNG'
+        if extension == '.gif':
+            return 'GIF'
+        return None
+
     async def process_image_async(self,
                                   source_image_path: str,
-                                  format_name: Optional[str] = None,
                                   loop: Optional[AbstractEventLoop] = None,
                                   executor=None):
         if not isinstance(self.store, FileStore):
@@ -415,18 +428,15 @@ class Gallerist:
         if loop is None:
             loop = asyncio.get_event_loop()
 
-        stream = await self.store.read_file(source_image_path)
+        data = await self.store.read_file(source_image_path)
 
-        if stream is None:
+        if data is None:
             raise SourceImageNotFoundError()
 
-        try:
-            image = self.parse_image(stream)
-            image_format = self.get_format(image, format_name.upper())
+        image = self.parse_image(data)
+        image_format = self.get_format(image, self.format_by_extension(source_image_path) or 'JPEG')
 
-            metadata = await self._generate_images_async(image, image_format, loop, executor)
-        finally:
-            stream.close()
+        metadata = await self._generate_images_async(image, image_format, loop, executor)
 
         return metadata
 
@@ -474,8 +484,8 @@ class Gallerist:
         for size in self.sizes_for_mime(image_mime):
             yield ImageVersion(size.name, self.new_id(), size.resize_to)
 
-    def parse_image(self, stream: BinaryIO) -> Image:
-        image = Image.open(stream)
+    def parse_image(self, data: bytes) -> Image:
+        image = Image.open(BytesIO(data))
         image = self._verify_mode_and_rotation(image)
         return image
 

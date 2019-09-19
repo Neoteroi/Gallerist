@@ -23,6 +23,6 @@ setup(name='gallerist',
       keywords='pictures images web',
       license='MIT',
       packages=['gallerist'],
-      install_requires=[],
+      install_requires=['aiofiles', 'Pillow'],
       include_package_data=True,
       zip_safe=False)

@@ -1,16 +1,16 @@
 from abc import ABC, abstractmethod
-from typing import BinaryIO, Union
+from typing import Union
 
 
 class FileStore(ABC):
     """A store that operates on files asynchronously."""
 
     @abstractmethod
-    async def read_file(self, file_path: str) -> BinaryIO:
-        """Reads a file stream by its unique path"""
+    async def read_file(self, file_path: str) -> bytes:
+        """Returns file contents by its unique path"""
 
     @abstractmethod
-    async def write_file(self, file_path: str, stream: BinaryIO):
+    async def write_file(self, file_path: str, data: bytes):
         """Writes a file to a given unique path"""
 
     @abstractmethod
@@ -22,11 +22,11 @@ class SyncFileStore(ABC):
     """A store that operates on files synchronously."""
 
     @abstractmethod
-    def read_file(self, file_path: str) -> BinaryIO:
-        """Reads a file stream by its unique path"""
+    def read_file(self, file_path: str) -> bytes:
+        """Returns file contents by its unique path"""
 
     @abstractmethod
-    def write_file(self, file_path: str, stream: BinaryIO):
+    def write_file(self, file_path: str, data: bytes):
         """Writes a file to a given unique path"""
 
     @abstractmethod
