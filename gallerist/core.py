@@ -1,7 +1,9 @@
 import uuid
+import asyncio
 from io import BytesIO
+from asyncio import AbstractEventLoop
 from dataclasses import dataclass
-from typing import BinaryIO, Sequence, Optional, Dict, List, Generator, Tuple
+from typing import BinaryIO, Sequence, Optional, Dict, List, Generator
 from gallerist.abc import FileStoreType, FileStore, SyncFileStore
 from PIL import Image, ImageSequence
 
@@ -56,7 +58,7 @@ class ImageFormat:
     extension: str
     quality: int
 
-    def to_bytes(self, wrapper: ImageWrapper) -> bytes:
+    def to_bytes(self, wrapper: ImageWrapper) -> BytesIO:
         image = wrapper.image
         byte_io = BytesIO()
         if self.quality > 0:
@@ -64,7 +66,7 @@ class ImageFormat:
         else:
             image.save(byte_io, image.format)
         byte_io.seek(0)
-        return byte_io.read()
+        return byte_io
 
 
 class GifFormat(ImageFormat):
@@ -72,7 +74,7 @@ class GifFormat(ImageFormat):
     def __init__(self):
         super().__init__('image/gif', 'GIF', '.gif', -1)
 
-    def to_bytes(self, wrapper: ImageWrapper) -> bytes:
+    def to_bytes(self, wrapper: ImageWrapper) -> BytesIO:
         if wrapper.n_frames == 1:
             return super().to_bytes(wrapper)
         byte_io = BytesIO()
@@ -88,7 +90,7 @@ class GifFormat(ImageFormat):
                                duration=wrapper.info.get('duration', 100),
                                loop=0)
         byte_io.seek(0)
-        return byte_io.read()
+        return byte_io
 
 
 @dataclass
@@ -107,6 +109,7 @@ class ImageVersion:
     size_name: str
     id: str
     max_side: int
+    file_name: str = None
 
 
 @dataclass
@@ -158,6 +161,14 @@ class SizesNotConfiguredForMimeError(GalleristError):
         super().__init__(f'Image sizes are not configured for mime `{image_mime}`; '
                          f'to correct, use the `sizes` option of the Gallerist constructor; '
                          f'or override `default_sizes` in a base class')
+
+
+class FormatNotConfiguredWithNameError(GalleristError):
+
+    def __init__(self, format_name: str):
+        super().__init__(f'Image format not configured with name `{format_name}`; '
+                         f'to correct, use the `formats` option of the Gallerist constructor; '
+                         f'or override `default_formats` in a base class')
 
 
 class FormatNotConfiguredForMimeError(GalleristError):
@@ -275,6 +286,19 @@ class Gallerist:
         else:
             raise SizesNotConfiguredForMimeError(image_mime)
 
+    def get_format(self, image: Image, image_format: Optional[str]) -> ImageFormat:
+        if not image_format:
+            image_format = image.format
+
+        if not image_format:
+            raise MissingImageFormatError()
+
+        for handled_format in self.formats:
+            if handled_format.name == image_format:
+                return handled_format
+
+        raise FormatNotConfiguredWithNameError(image_format)
+
     def format_by_mime(self, image_mime: str) -> ImageFormat:
         for handled_format in self.formats:
             if handled_format.mime == image_mime:
@@ -321,7 +345,7 @@ class Gallerist:
         if image.format == 'GIF':
             return image
 
-        if image.mode != 'RGB':
+        if image.mode == 'CMK':
             image = image.convert('RGB')
 
         return self.auto_rotate(image)
@@ -354,91 +378,116 @@ class Gallerist:
 
         return ImageWrapper.from_frames([frame.resize(sc, Image.BOX) for frame in ImageSequence.Iterator(image)])
 
-    def image_to_bytes(self, wrapper: ImageWrapper) -> bytes:
-        image_format = self.format_by_mime(Image.MIME[wrapper.format])
-        return image_format.to_bytes(wrapper)
-
-    def process_image(self, source_image_path: str):
+    def process_image(self,
+                      source_image_path: str,
+                      format_name: Optional[str] = None):
         if not isinstance(self.store, SyncFileStore):
             raise ExpectedSyncStoreError()
 
-        raise NotImplemented()
+        stream = self.store.read_file(source_image_path)
 
-    async def process_image_async(self, source_image_path: str):
-        # TODO: see input in ASWE, how to make it abstract
-        # TODO: support container name input?
+        if stream is None:
+            raise SourceImageNotFoundError()
+
+        try:
+            image = self.parse_image(stream)
+            image_format = self.get_format(image, format_name.upper())
+
+            metadata = self._generate_images(image, image_format)
+        finally:
+            stream.close()
+
+        return metadata
+
+    def get_image_name(self,
+                       version: ImageVersion,
+                       image_format: ImageFormat):
+        return f'{version.size_name[0]}-{version.id}{image_format.extension}'
+
+    async def process_image_async(self,
+                                  source_image_path: str,
+                                  format_name: Optional[str] = None,
+                                  loop: Optional[AbstractEventLoop] = None,
+                                  executor=None):
         if not isinstance(self.store, FileStore):
             raise ExpectedAsyncStoreError()
 
-        # 1. Load an original image from a source
+        if loop is None:
+            loop = asyncio.get_event_loop()
+
         stream = await self.store.read_file(source_image_path)
 
         if stream is None:
             raise SourceImageNotFoundError()
 
-        # 2. Prepare images in various sizes, depending on configuration
-        # TODO: how to make this in an executor?
-        for version, prepared_image in self.prepare_images(stream):
-            # 3. Store prepared images in the target source
-            await self.store.write_file("TODO!", prepared_image)
+        try:
+            image = self.parse_image(stream)
+            image_format = self.get_format(image, format_name.upper())
 
-            # TODO: select a location for the generated file; this must come from a strategy (NamingStrategy ?)
+            metadata = await self._generate_images_async(image, image_format, loop, executor)
+        finally:
+            stream.close()
 
-        # 4. Store metadata about the image (width, height, ratio, extension, mime, bytes size, etc.)
-        # 5. Return metadata
-        pass
+        return metadata
 
-    def get_versions(self, image_mime: str):
+    async def _generate_images_async(self,
+                                     image: Image,
+                                     image_format: ImageFormat,
+                                     loop: AbstractEventLoop,
+                                     executor) -> ImageMetadata:
+        metadata = self.get_metadata(image, image_format)
+
+        for version in self.get_versions(image_format.mime):
+            image_name = self.get_image_name(version, image_format)
+            version.file_name = image_name
+            metadata.versions.append(version)
+            resized_image = await loop.run_in_executor(executor, self.resize_to_max_side, image, version.max_side)
+            resized_image.format = image_format.name
+
+            await self.store.write_file(image_name, image_format.to_bytes(resized_image))
+
+        return metadata
+
+    def _generate_images(self,
+                         image: Image,
+                         image_format: ImageFormat) -> ImageMetadata:
+        metadata = self.get_metadata(image, image_format)
+
+        for version in self.get_versions(image_format.mime):
+            image_name = self.get_image_name(version, image_format)
+            version.file_name = image_name
+            metadata.versions.append(version)
+            resized_image = self.resize_to_max_side(image, version.max_side)
+            resized_image.format = image_format.name
+
+            self.store.write_file(image_name, image_format.to_bytes(resized_image))
+
+        return metadata
+
+    def get_versions(self, image_mime: str) -> Generator[ImageVersion, None, None]:
+        """
+        Returns versions to be generated for a given image mime, new ids are assigned here.
+
+        :param image_mime: mime type.
+        :return: a sequence of ImageVersion
+        """
         for size in self.sizes_for_mime(image_mime):
             yield ImageVersion(size.name, self.new_id(), size.resize_to)
 
     def parse_image(self, stream: BinaryIO) -> Image:
         image = Image.open(stream)
         image = self._verify_mode_and_rotation(image)
-        # TODO: handle images without format
-        image_format = image.format
-        image_mime = Image.MIME[image_format]
+        return image
 
-    # OBSOLETE!
-    def prepare_images(self, stream: BinaryIO) -> Generator[Tuple[ImageVersion, bytes], None, None]:
-        """
-        Prepares an image in various sizes, starting from an original image and
-        depending on configured sizes by mime type.
-
-        :param stream: binary stream representing an image.
-        """
-        image = Image.open(stream)
-        image = self._verify_mode_and_rotation(image)
-
-        if not image_format and not image.format:
-            raise MissingImageFormatError()
-
-        image_mime = Image.MIME[image_format or image.format]
-
-        if self.remove_exif:
-            image = self.strip_exif(image)
-
-        # versions = []
-
-        for size in self.sizes_for_mime(image_mime):
-            resized_image = self.resize_to_max_side(image, size.resize_to)
-            resized_image.format = image_format
-            # TODO: yield the version!! :)
-            version = ImageVersion(size.name, self.new_id(), size.resize_to)
-            # versions.append(version)
-
-            yield version, self.image_to_bytes(resized_image)
-
-    def foo():
-        # TODO: not nice?
+    def get_metadata(self,
+                     image: Image,
+                     image_format: ImageFormat):
         width, height = image.size
-        options = self.format_by_mime(image_mime)
-        # if storing image bytes, why not metadata as well?
+
         return ImageMetadata(width,
                              height,
                              width / height,
-                             options.extension,
-                             image_mime,
-                             versions=versions)
-
+                             image_format.extension,
+                             image_format.mime,
+                             [])
 

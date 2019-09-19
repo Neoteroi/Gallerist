@@ -35,11 +35,3 @@ class SyncFileStore(ABC):
 
 
 FileStoreType = Union[FileStore, SyncFileStore]
-
-
-class ImageStore(FileStore):
-    """File store specialized for pictures"""
-
-    @abstractmethod
-    async def store_picture_metadata(self):
-        """Stores metadata about a picture."""

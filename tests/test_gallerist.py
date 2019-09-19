@@ -1,39 +1,47 @@
 import os
 import pytest
+from shutil import rmtree
 from typing import BinaryIO
 from gallerist.core import Gallerist, FileStore
 
 
+rmtree('out')
 os.makedirs('out', exist_ok=True)
 
 
-class NoopStore(FileStore):
+class FakeStore(FileStore):
 
-    async def store_picture_metadata(self):
-        pass
+    def __init__(self):
+        self.folder_name = 'out'
+
+    def full_path(self, file_path: str):
+        return os.path.join(self.folder_name, file_path)
 
     async def read_file(self, file_path: str) -> BinaryIO:
-        pass
+        return open(file_path, 'rb')
 
     async def write_file(self, file_path: str, stream: BinaryIO):
-        pass
+        with open(self.full_path(file_path), 'wb') as file:
+            stream.seek(0)
+            file.write(stream.read())
 
     async def delete_file(self, file_path: str):
-        pass
+        try:
+            os.remove(self.full_path(file_path))
+        except FileNotFoundError:
+            pass
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('file_path,file_name_fn,image_format', [
-    ['files/pexels-photo-126407.jpeg', lambda i: f'jpg_{i}.jpg', 'JPEG'],
-    ['files/png_01.png', lambda i: f'png_{i}.png', 'PNG'],
-    ['files/01.gif', lambda i: f'gif_{i}.gif', 'GIF']
+@pytest.mark.parametrize('file_path,image_format', [
+    ['files/pexels-photo-126407.jpeg', 'JPEG'],
+    ['files/blacksheep.png', 'PNG'],
+    ['files/01.gif', 'GIF']
 ])
-async def test_prepare_for_web(file_path, file_name_fn, image_format):
-    gallerist = Gallerist(NoopStore())
+async def test_prepare_for_web(file_path: str, image_format: str):
+    gallerist = Gallerist(FakeStore())
 
-    with open(file_path, 'rb') as file:
-        i = 0
-        for version, image in gallerist.prepare_images(file, image_format):
-            i += 1
-            with open(os.path.join('out', file_name_fn(i)), 'wb') as ff:
-                ff.write(image)
+    metadata = await gallerist.process_image_async(file_path, image_format)
+
+    assert metadata is not None
+

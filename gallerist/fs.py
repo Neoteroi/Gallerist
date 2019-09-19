@@ -1,9 +1,10 @@
 import os
 import aiofiles
 from typing import BinaryIO
-from gallerist.abc import FileStore, ImageStore
+from gallerist.abc import FileStore, SyncFileStore
 
 
+# TODO: bytes or BinaryIO?
 class FileSystemFileStore(FileStore):
 
     async def read_file(self, file_path: str) -> BinaryIO:
@@ -18,7 +19,13 @@ class FileSystemFileStore(FileStore):
         os.remove(file_path)
 
 
-class FileSystemImageStore(FileSystemFileStore, ImageStore):
+class FileSystemSyncFileStore(SyncFileStore):
 
-    async def store_picture_metadata(self):
+    def read_file(self, file_path: str) -> BinaryIO:
+        pass
+
+    def write_file(self, file_path: str, stream: BinaryIO):
+        pass
+
+    def delete_file(self, file_path: str):
         pass
