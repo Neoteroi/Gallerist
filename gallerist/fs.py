@@ -4,6 +4,9 @@ from typing import Optional
 from gallerist.abc import FileStore, SyncFileStore
 
 
+__all__ = ('FileSystemFileStore', 'FileSystemSyncFileStore')
+
+
 class BaseFileSystemFileStore:
 
     def __init__(self, folder_name: Optional[str]):

@@ -152,29 +152,6 @@ class ImageMetadata:
     versions: List[ImageVersion]
 
 
-class PictureForWebOutput:
-
-    def __init__(self,
-                 medium_file_id: str,
-                 medium_file_name: str,
-                 thumbnail_file_id: str,
-                 thumbnail_file_name: str,
-                 width: int,
-                 height: int,
-                 ratio: float,
-                 extension: str,
-                 mime: str):
-        self.medium_file_id = medium_file_id
-        self.medium_file_name = medium_file_name
-        self.thumbnail_file_id = thumbnail_file_id
-        self.thumbnail_file_name = thumbnail_file_name
-        self.width = width
-        self.height = height
-        self.ratio = ratio
-        self.extension = extension
-        self.mime = mime
-
-
 class GalleristError(Exception):
     """Base class for exceptions risen by Gallerist class"""
 
@@ -209,17 +186,6 @@ class FormatNotConfiguredForMimeError(GalleristError):
                          f'or override `default_formats` in a base class')
 
 
-class ImageResizingException(GalleristError):
-
-    def __init__(self,
-                 inner_exception,
-                 image_name,
-                 available_data: PictureForWebOutput):
-        super().__init__(f'An exception happened while resizing the image: {image_name}; error: '
-                         + exception_str(inner_exception))
-        self.data = available_data
-
-
 class InvalidStoreTypeError(GalleristError):
     """Base class for errors related to invalid store configuration."""
 
@@ -250,11 +216,9 @@ class Gallerist:
     def __init__(self,
                  store: FileStoreType,
                  sizes: Optional[ImageSizesType] = None,
-                 formats: Optional[Sequence[ImageFormat]] = None,
-                 remove_exif: bool = False):
+                 formats: Optional[Sequence[ImageFormat]] = None):
         self._sizes = None
         self.store = store
-        self.remove_exif = remove_exif
         self.formats = formats or self.default_formats
         self.sizes = sizes or self.default_sizes
 
@@ -272,6 +236,12 @@ class Gallerist:
         GifFormat(),
         MpoFormat()
     ]
+
+    def is_handled_mime(self, mime_type: str):
+        for handled_format in self.formats:
+            if handled_format.mime == mime_type:
+                return True
+        return False
 
     @property
     def sizes(self):
@@ -341,13 +311,6 @@ class Gallerist:
             if orientation in rotate_values:
                 return img.rotate(rotate_values[orientation], expand=True)
         return img
-
-    def strip_exif(self, image: Image) -> Image:
-        # TODO: is this right?
-        image_without_exif = Image.new(image.mode, image.size)
-        image_without_exif.putdata(list(image.getdata()))
-        image_without_exif.format = image.format
-        return image_without_exif
 
     def _verify_mode_and_rotation(self, image: Image):
         if image.format == 'GIF':
