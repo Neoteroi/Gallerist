@@ -5,10 +5,12 @@ from shutil import rmtree
 from gallerist.core import Gallerist, FileStore, SyncFileStore
 
 
-if os.path.exists('out'):
-    rmtree('out')
+out_path = os.path.join('test', 'out') if os.path.isdir('tests') else 'out'
 
-os.makedirs('out', exist_ok=True)
+if os.path.exists(out_path):
+    rmtree(out_path)
+
+os.makedirs(out_path, exist_ok=True)
 
 
 class FakeSyncStore(SyncFileStore):
