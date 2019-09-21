@@ -7,7 +7,7 @@ def readme():
 
 
 setup(name='gallerist',
-      version='0.0.1',
+      version='0.0.3',
       description='Classes and methods to handle pictures for the web',
       long_description=readme(),
       long_description_content_type='text/markdown',

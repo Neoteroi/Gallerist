@@ -1,3 +1,5 @@
+[![Build Status](https://dev.azure.com/robertoprevato/Nest/_apis/build/status/RobertoPrevato.Gallerist?branchName=master)](https://dev.azure.com/robertoprevato/Nest/_build/latest?definitionId=26&branchName=master) [![pypi](https://img.shields.io/pypi/v/Gallerist.svg?color=blue)](https://pypi.org/project/Gallerist/)
+
 # Gallerist
 Classes and methods to handle pictures for the web, using [Pillow](https://pillow.readthedocs.io).
 
