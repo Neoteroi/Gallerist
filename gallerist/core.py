@@ -3,7 +3,6 @@ import uuid
 import asyncio
 from io import BytesIO
 from asyncio import AbstractEventLoop
-from dataclasses import dataclass
 from typing import Sequence, Optional, Dict, List, Generator
 from gallerist.abc import FileStoreType, FileStore, SyncFileStore
 from PIL import Image, ImageSequence
@@ -57,12 +56,21 @@ class ImageWrapper:
         self.frames = list(ImageSequence.Iterator(self.image))
 
 
-@dataclass
 class ImageFormat:
-    mime: str
-    name: str
-    extension: str
-    quality: int
+
+    def __init__(self,
+                 mime: str,
+                 name: str,
+                 extension: str,
+                 quality: int):
+        self.mime = mime
+        self.name = name
+        self.extension = extension
+        self.quality = quality
+
+    def __repr__(self):
+        return f'<ImageFormat mime="{self.mime}" name="{self.name}" ' \
+               f'extension="{self.extension}" quality="{self.quality}">'
 
     def to_bytes(self, wrapper: ImageWrapper) -> bytes:
         image = wrapper.image
@@ -123,33 +131,64 @@ class GifFormat(ImageFormat):
         return byte_io.read()
 
 
-@dataclass
 class ImageSize:
     __slots__ = ('name', 'resize_to')
 
-    name: str
-    resize_to: int
+    def __init__(self,
+                 name: str,
+                 resize_to: int):
+        self.name = name
+        self.resize_to = resize_to
+
+    def __repr__(self):
+        return f'<ImageSize name="{self.name}" resize_to={self.resize_to}>'
 
 
 ImageSizesType = Dict[str, Sequence[ImageSize]]
 
 
-@dataclass
 class ImageVersion:
-    size_name: str
-    id: str
-    max_side: int
-    file_name: str = None
+
+    __slots__ = ('size_name', 'id', 'max_side', 'file_name')
+
+    def __init__(self,
+                 size_name: str,
+                 id: str,
+                 max_side: int,
+                 file_name: str = None):
+        self.size_name = size_name
+        self.id = id
+        self.max_side = max_side
+        self.file_name = file_name
+
+    def __repr__(self):
+        return f'<ImageVersion size_name="{self.size_name}" id="{self.id}" ' \
+               f'max_side={self.max_side} file_name="{self.file_name}">'
 
 
-@dataclass
 class ImageMetadata:
-    width: int
-    height: int
-    ratio: float
-    extension: str
-    mime: str
-    versions: List[ImageVersion]
+
+    __slots__ = ('width', 'height', 'extension', 'mime', 'versions')
+
+    def __init__(self,
+                 width: int,
+                 height: int,
+                 extension: str,
+                 mime: str,
+                 versions: List[ImageVersion]):
+        self.width = width
+        self.height = height
+        self.extension = extension
+        self.mime = mime
+        self.versions = versions
+
+    def __repr__(self):
+        return f'<ImageMetadata width={self.width} height={self.height} ' \
+               f'extension="{self.extension}" mime="{self.mime}" versions={self.versions}>'
+
+    @property
+    def ratio(self) -> float:
+        return self.width / self.height
 
 
 class GalleristError(Exception):
@@ -459,7 +498,6 @@ class Gallerist:
 
         return ImageMetadata(width,
                              height,
-                             width / height,
                              image_format.extension,
                              image_format.mime,
                              [])
