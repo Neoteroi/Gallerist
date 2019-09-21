@@ -34,12 +34,12 @@ steps:
 - script: |
     pip install --upgrade twine setuptools wheel
     python setup.py sdist bdist_wheel
-  condition: eq('${{ python.version }}', '3.7'))
+  condition: eq('$(python.version)', '3.7'))
   displayName: 'create artifacts'
 
 - task: PublishBuildArtifacts@1
   inputs:
     pathtoPublish: dist
     artifactName: dist
-  condition: eq('${{ python.version }}', '3.7'))
+  condition: eq('$(python.version)', '3.7'))
   displayName: 'publish artifacts'
