@@ -11,9 +11,9 @@ $ pip install gallerist
 * Code api to handle the generation of pictures in various sizes (e.g. medium size picture, small size, thumbnail)
 * Both asynchronous api and synchronous api
 * Supports user defined stores for binaries, for example to read and write files in [Azure Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/), or [AWS S3](https://aws.amazon.com/s3/)
-* Supports scaling animated GIF files
-* Maintain PNG transparencies
 * Handles by default JPG, PNG, GIF, MPO; and provides a code api to support adding more supported formats
+* Supports scaling animated GIF files (resized gifs are still animated)
+* Maintains PNG transparencies
 
 ## Examples
 Basic example using the synchronous api, and reading files from file system:
