@@ -4,7 +4,7 @@ import asyncio
 from io import BytesIO
 from asyncio import AbstractEventLoop
 from typing import Sequence, Optional, Dict, List, Generator
-from gallerist.abc import FileStoreType, FileStore, SyncFileStore
+from gallerist.abc import FileStoreType, FileStore, SyncFileStore, FileInfo
 from PIL import Image, ImageSequence
 
 
@@ -140,6 +140,12 @@ class ImageSize:
         self.name = name
         self.resize_to = resize_to
 
+    def to_dict(self):
+        return {
+            'name': self.name,
+            'resize_to': self.resize_to
+        }
+
     def __repr__(self):
         return f'<ImageSize name="{self.name}" resize_to={self.resize_to}>'
 
@@ -161,6 +167,14 @@ class ImageVersion:
         self.max_side = max_side
         self.file_name = file_name
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'size_name': self.size_name,
+            'max_side': self.max_side,
+            'file_name': self.file_name
+        }
+
     def __repr__(self):
         return f'<ImageVersion size_name="{self.size_name}" id="{self.id}" ' \
                f'max_side={self.max_side} file_name="{self.file_name}">'
@@ -181,6 +195,16 @@ class ImageMetadata:
         self.extension = extension
         self.mime = mime
         self.versions = versions
+
+    def to_dict(self):
+        return {
+            'width': self.width,
+            'height': self.height,
+            'extension': self.extension,
+            'ratio': self.ratio,
+            'mime': self.mime,
+            'versions': [version.to_dict() for version in self.versions]
+        }
 
     def __repr__(self):
         return f'<ImageMetadata width={self.width} height={self.height} ' \
@@ -355,7 +379,7 @@ class Gallerist:
         if image.format == 'GIF':
             return image
 
-        if image.mode == 'CMK':
+        if image.mode == 'CMYK':
             image = image.convert('RGB')
 
         return self.auto_rotate(image)
@@ -402,6 +426,7 @@ class Gallerist:
 
         metadata = self._generate_images(image, image_format)
 
+        image.close()
         return metadata
 
     def get_image_name(self,
@@ -440,6 +465,7 @@ class Gallerist:
 
         metadata = await self._generate_images_async(image, image_format, loop, executor)
 
+        image.close()
         return metadata
 
     async def _generate_images_async(self,
@@ -456,7 +482,10 @@ class Gallerist:
             resized_image = await loop.run_in_executor(executor, self.resize_to_max_side, image, version.max_side)
             resized_image.format = image_format.name
 
-            await self.store.write_file(image_name, image_format.to_bytes(resized_image))
+            await self.store.write_file(image_name,
+                                        image_format.to_bytes(resized_image),
+                                        FileInfo(image_format.mime,
+                                                 image_format.extension))
 
         return metadata
 
@@ -472,7 +501,10 @@ class Gallerist:
             resized_image = self.resize_to_max_side(image, version.max_side)
             resized_image.format = image_format.name
 
-            self.store.write_file(image_name, image_format.to_bytes(resized_image))
+            self.store.write_file(image_name,
+                                  image_format.to_bytes(resized_image),
+                                  FileInfo(image_format.mime,
+                                           image_format.extension))
 
         return metadata
 

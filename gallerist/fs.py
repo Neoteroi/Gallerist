@@ -1,7 +1,7 @@
 import os
 import aiofiles
 from typing import Optional
-from gallerist.abc import FileStore, SyncFileStore
+from gallerist.abc import FileStore, SyncFileStore, FileInfo
 
 
 __all__ = ('FileSystemFileStore', 'FileSystemSyncFileStore')
@@ -24,7 +24,7 @@ class FileSystemFileStore(FileStore, BaseFileSystemFileStore):
         async with aiofiles.open(self.full_path(file_path), mode='rb') as f:
             return await f.read()
 
-    async def write_file(self, file_path: str, data: bytes):
+    async def write_file(self, file_path: str, data: bytes, info: FileInfo):
         async with aiofiles.open(self.full_path(file_path), mode='wb') as f:
             await f.write(data)
 
@@ -41,7 +41,7 @@ class FileSystemSyncFileStore(SyncFileStore, BaseFileSystemFileStore):
         with open(self.full_path(file_path), 'rb') as file:
             return file.read()
 
-    def write_file(self, file_path: str, data: bytes):
+    def write_file(self, file_path: str, data: bytes, info: FileInfo):
         with open(self.full_path(file_path), 'wb') as file:
             file.write(data)
 
