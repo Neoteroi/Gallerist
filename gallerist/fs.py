@@ -4,11 +4,10 @@ from typing import Optional
 from gallerist.abc import FileStore, SyncFileStore, FileInfo
 
 
-__all__ = ('FileSystemFileStore', 'FileSystemSyncFileStore')
+__all__ = ("FileSystemFileStore", "FileSystemSyncFileStore")
 
 
 class BaseFileSystemFileStore:
-
     def __init__(self, folder_name: Optional[str]):
         self.folder_name = folder_name
 
@@ -19,13 +18,12 @@ class BaseFileSystemFileStore:
 
 
 class FileSystemFileStore(FileStore, BaseFileSystemFileStore):
-
     async def read_file(self, file_path: str) -> bytes:
-        async with aiofiles.open(self.full_path(file_path), mode='rb') as f:
+        async with aiofiles.open(self.full_path(file_path), mode="rb") as f:
             return await f.read()
 
     async def write_file(self, file_path: str, data: bytes, info: FileInfo):
-        async with aiofiles.open(self.full_path(file_path), mode='wb') as f:
+        async with aiofiles.open(self.full_path(file_path), mode="wb") as f:
             await f.write(data)
 
     async def delete_file(self, file_path: str):
@@ -36,13 +34,12 @@ class FileSystemFileStore(FileStore, BaseFileSystemFileStore):
 
 
 class FileSystemSyncFileStore(SyncFileStore, BaseFileSystemFileStore):
-
     def read_file(self, file_path: str) -> bytes:
-        with open(self.full_path(file_path), 'rb') as file:
+        with open(self.full_path(file_path), "rb") as file:
             return file.read()
 
     def write_file(self, file_path: str, data: bytes, info: FileInfo):
-        with open(self.full_path(file_path), 'wb') as file:
+        with open(self.full_path(file_path), "wb") as file:
             file.write(data)
 
     def delete_file(self, file_path: str):
@@ -50,4 +47,3 @@ class FileSystemSyncFileStore(SyncFileStore, BaseFileSystemFileStore):
             os.remove(self.full_path(file_path))
         except FileNotFoundError:
             pass
-

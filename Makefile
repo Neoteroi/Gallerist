@@ -23,3 +23,5 @@ release: clean artifacts
 test:
 	python -m pytest
 
+testcov:
+	pytest --cov-report html --cov=gallerist tests/

@@ -4,7 +4,7 @@ from typing import Union
 
 class FileInfo:
 
-    __slots__ = ('mime', 'extension')
+    __slots__ = ("mime", "extension")
 
     def __init__(self, mime: str, extension: str):
         self.mime = mime
@@ -14,10 +14,7 @@ class FileInfo:
         return f'<FileInfo mime="{self.mime}" extension="{self.extension}">'
 
     def to_dict(self):
-        return {
-            'mime': self.mime,
-            'extension': self.extension
-        }
+        return {"mime": self.mime, "extension": self.extension}
 
 
 class FileStore(ABC):
