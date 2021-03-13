@@ -19,7 +19,7 @@ def get_file_extension(file_path):
 
 class ImageWrapper:
 
-    __slots__ = ('image', 'frames')
+    __slots__ = ("image", "frames")
 
     def __init__(self, image, frames=None):
         self.image = image
@@ -30,7 +30,7 @@ class ImageWrapper:
         if self.frames:
             return len(self.frames)
         # frames count can be known, while actual frames are not loaded in memory
-        return getattr(self.image, 'n_frames', 1)
+        return getattr(self.image, "n_frames", 1)
 
     @property
     def is_animated(self):
@@ -57,20 +57,17 @@ class ImageWrapper:
 
 
 class ImageFormat:
-
-    def __init__(self,
-                 mime: str,
-                 name: str,
-                 extension: str,
-                 quality: int):
+    def __init__(self, mime: str, name: str, extension: str, quality: int):
         self.mime = mime
         self.name = name
         self.extension = extension
         self.quality = quality
 
     def __repr__(self):
-        return f'<ImageFormat mime="{self.mime}" name="{self.name}" ' \
-               f'extension="{self.extension}" quality="{self.quality}">'
+        return (
+            f'<ImageFormat mime="{self.mime}" name="{self.name}" '
+            f'extension="{self.extension}" quality="{self.quality}">'
+        )
 
     def to_bytes(self, wrapper: ImageWrapper) -> bytes:
         image = wrapper.image
@@ -84,33 +81,28 @@ class ImageFormat:
 
 
 class JpegFormat(ImageFormat):
-
     def __init__(self):
-        super().__init__('image/jpeg', 'JPEG', '.jpg', 80)
+        super().__init__("image/jpeg", "JPEG", ".jpg", 80)
 
 
 class PJpegFormat(ImageFormat):
-
     def __init__(self):
-        super().__init__('image/pjpeg', 'JPEG', '.jpg', 80)
+        super().__init__("image/pjpeg", "JPEG", ".jpg", 80)
 
 
 class PngFormat(ImageFormat):
-
     def __init__(self):
-        super().__init__('image/png', 'PNG', '.png', -1)
+        super().__init__("image/png", "PNG", ".png", -1)
 
 
 class MpoFormat(ImageFormat):
-
     def __init__(self):
-        super().__init__('image/mpo', 'JPEG', '.jpg', 80)
+        super().__init__("image/mpo", "JPEG", ".jpg", 80)
 
 
 class GifFormat(ImageFormat):
-
     def __init__(self):
-        super().__init__('image/gif', 'GIF', '.gif', -1)
+        super().__init__("image/gif", "GIF", ".gif", -1)
 
     def to_bytes(self, wrapper: ImageWrapper) -> bytes:
         if wrapper.n_frames == 1:
@@ -120,31 +112,28 @@ class GifFormat(ImageFormat):
         if not wrapper.frames:
             wrapper.load_frames()
 
-        wrapper.frames[0].save(byte_io,
-                               format=self.name,
-                               optimize=True,
-                               save_all=True,
-                               append_images=wrapper.frames[1:],
-                               duration=wrapper.info.get('duration', 100),
-                               loop=0)
+        wrapper.frames[0].save(
+            byte_io,
+            format=self.name,
+            optimize=True,
+            save_all=True,
+            append_images=wrapper.frames[1:],
+            duration=wrapper.info.get("duration", 100),
+            loop=0,
+        )
         byte_io.seek(0)
         return byte_io.read()
 
 
 class ImageSize:
-    __slots__ = ('name', 'resize_to')
+    __slots__ = ("name", "resize_to")
 
-    def __init__(self,
-                 name: str,
-                 resize_to: int):
+    def __init__(self, name: str, resize_to: int):
         self.name = name
         self.resize_to = resize_to
 
     def to_dict(self):
-        return {
-            'name': self.name,
-            'resize_to': self.resize_to
-        }
+        return {"name": self.name, "resize_to": self.resize_to}
 
     def __repr__(self):
         return f'<ImageSize name="{self.name}" resize_to={self.resize_to}>'
@@ -155,13 +144,9 @@ ImageSizesType = Dict[str, Sequence[ImageSize]]
 
 class ImageVersion:
 
-    __slots__ = ('size_name', 'id', 'max_side', 'file_name')
+    __slots__ = ("size_name", "id", "max_side", "file_name")
 
-    def __init__(self,
-                 size_name: str,
-                 id: str,
-                 max_side: int,
-                 file_name: str = None):
+    def __init__(self, size_name: str, id: str, max_side: int, file_name: str = None):
         self.size_name = size_name
         self.id = id
         self.max_side = max_side
@@ -169,27 +154,31 @@ class ImageVersion:
 
     def to_dict(self):
         return {
-            'id': self.id,
-            'size_name': self.size_name,
-            'max_side': self.max_side,
-            'file_name': self.file_name
+            "id": self.id,
+            "size_name": self.size_name,
+            "max_side": self.max_side,
+            "file_name": self.file_name,
         }
 
     def __repr__(self):
-        return f'<ImageVersion size_name="{self.size_name}" id="{self.id}" ' \
-               f'max_side={self.max_side} file_name="{self.file_name}">'
+        return (
+            f'<ImageVersion size_name="{self.size_name}" id="{self.id}" '
+            f'max_side={self.max_side} file_name="{self.file_name}">'
+        )
 
 
 class ImageMetadata:
 
-    __slots__ = ('width', 'height', 'extension', 'mime', 'versions')
+    __slots__ = ("width", "height", "extension", "mime", "versions")
 
-    def __init__(self,
-                 width: int,
-                 height: int,
-                 extension: str,
-                 mime: str,
-                 versions: List[ImageVersion]):
+    def __init__(
+        self,
+        width: int,
+        height: int,
+        extension: str,
+        mime: str,
+        versions: List[ImageVersion],
+    ):
         self.width = width
         self.height = height
         self.extension = extension
@@ -198,17 +187,19 @@ class ImageMetadata:
 
     def to_dict(self):
         return {
-            'width': self.width,
-            'height': self.height,
-            'extension': self.extension,
-            'ratio': self.ratio,
-            'mime': self.mime,
-            'versions': [version.to_dict() for version in self.versions]
+            "width": self.width,
+            "height": self.height,
+            "extension": self.extension,
+            "ratio": self.ratio,
+            "mime": self.mime,
+            "versions": [version.to_dict() for version in self.versions],
         }
 
     def __repr__(self):
-        return f'<ImageMetadata width={self.width} height={self.height} ' \
-               f'extension="{self.extension}" mime="{self.mime}" versions={self.versions}>'
+        return (
+            f"<ImageMetadata width={self.width} height={self.height} "
+            f'extension="{self.extension}" mime="{self.mime}" versions={self.versions}>'
+        )
 
     @property
     def ratio(self) -> float:
@@ -220,33 +211,35 @@ class GalleristError(Exception):
 
 
 class MissingImageFormatError(GalleristError):
-
     def __init__(self):
-        super().__init__('Cannot determine image format, please specify it.')
+        super().__init__("Cannot determine image format, please specify it.")
 
 
 class SizesNotConfiguredForMimeError(GalleristError):
-
     def __init__(self, image_mime: str):
-        super().__init__(f'Image sizes are not configured for mime `{image_mime}`; '
-                         f'to correct, use the `sizes` option of the Gallerist constructor; '
-                         f'or override `default_sizes` in a base class')
+        super().__init__(
+            f"Image sizes are not configured for mime `{image_mime}`; "
+            f"to correct, use the `sizes` option of the Gallerist constructor; "
+            f"or override `default_sizes` in a base class"
+        )
 
 
 class FormatNotConfiguredWithNameError(GalleristError):
-
     def __init__(self, format_name: str):
-        super().__init__(f'Image format not configured with name `{format_name}`; '
-                         f'to correct, use the `formats` option of the Gallerist constructor; '
-                         f'or override `default_formats` in a base class')
+        super().__init__(
+            f"Image format not configured with name `{format_name}`; "
+            f"to correct, use the `formats` option of the Gallerist constructor; "
+            f"or override `default_formats` in a base class"
+        )
 
 
 class FormatNotConfiguredForMimeError(GalleristError):
-
     def __init__(self, image_mime: str):
-        super().__init__(f'Image formats are not configured for mime `{image_mime}`; '
-                         f'to correct, use the `formats` option of the Gallerist constructor; '
-                         f'or override `default_formats` in a base class')
+        super().__init__(
+            f"Image formats are not configured for mime `{image_mime}`; "
+            f"to correct, use the `formats` option of the Gallerist constructor; "
+            f"or override `default_formats` in a base class"
+        )
 
 
 class InvalidStoreTypeError(GalleristError):
@@ -254,42 +247,45 @@ class InvalidStoreTypeError(GalleristError):
 
 
 class ExpectedSyncStoreError(InvalidStoreTypeError):
-
     def __init__(self):
-        super().__init__(f'A synchronous file store, inheriting {SyncFileStore.__name__}, is required to '
-                         f'run the synchronous `process_image`')
+        super().__init__(
+            f"A synchronous file store, inheriting {SyncFileStore.__name__}, "
+            f"is required to run the synchronous `process_image`"
+        )
 
 
 class ExpectedAsyncStoreError(InvalidStoreTypeError):
-
     def __init__(self):
-        super().__init__(f'An asynchronous file store, inheriting {FileStore.__name__}, is required to '
-                         f'run the asynchronous `process_image_async`')
+        super().__init__(
+            f"An asynchronous file store, inheriting {FileStore.__name__}, "
+            f"is required to run the asynchronous `process_image_async`"
+        )
 
 
 class SourceImageNotFoundError(GalleristError):
-
     def __init__(self):
-        super().__init__('The source image was not found, or could not be loaded.')
+        super().__init__("The source image was not found, or could not be loaded.")
 
 
 class Gallerist:
-    """Provides methods to prepare images in various sizes and store them with metadata."""
+    """
+    Provides methods to prepare images in various sizes and store them with metadata.
+    """
 
-    def __init__(self,
-                 store: FileStoreType,
-                 sizes: Optional[ImageSizesType] = None,
-                 formats: Optional[Sequence[ImageFormat]] = None):
+    def __init__(
+        self,
+        store: FileStoreType,
+        sizes: Optional[ImageSizesType] = None,
+        formats: Optional[Sequence[ImageFormat]] = None,
+    ):
         self._sizes = None
         self.store = store
         self.formats = formats or self.default_formats
         self.sizes = sizes or self.default_sizes
 
     default_sizes = {
-        '*': (ImageSize('medium', 1200),
-              ImageSize('thumbnail', 200)),
-        'image/gif': (ImageSize('medium', 200),
-                      ImageSize('thumbnail', 120))
+        "*": (ImageSize("medium", 1200), ImageSize("thumbnail", 200)),
+        "image/gif": (ImageSize("medium", 200), ImageSize("thumbnail", 120)),
     }
 
     default_formats = [
@@ -297,7 +293,7 @@ class Gallerist:
         PJpegFormat(),
         PngFormat(),
         GifFormat(),
-        MpoFormat()
+        MpoFormat(),
     ]
 
     def is_handled_mime(self, mime_type: str):
@@ -320,8 +316,8 @@ class Gallerist:
     def sizes_for_mime(self, image_mime: str) -> Sequence[ImageSize]:
         if image_mime in self.sizes:
             yield from self.sizes[image_mime]
-        elif '*' in self.sizes:
-            yield from self.sizes['*']
+        elif "*" in self.sizes:
+            yield from self.sizes["*"]
         else:
             raise SizesNotConfiguredForMimeError(image_mime)
 
@@ -347,16 +343,19 @@ class Gallerist:
         raise FormatNotConfiguredForMimeError(image_mime)
 
     def new_id(self) -> str:
-        return str(uuid.uuid4()).replace('-', '')
+        return str(uuid.uuid4()).replace("-", "")
 
     def get_extension_by_mime(self, mime: str):
         for handled_format in self.formats:
             if handled_format.mime == mime:
                 return handled_format.extension
-        raise ValueError(f'Type `{mime}` is not handled by this instance of {self.__class__.__name__}')
+        raise ValueError(
+            f"Type `{mime}` is not handled by this instance "
+            f"of {self.__class__.__name__}"
+        )
 
     def auto_rotate(self, img: Image) -> Image:
-        exif = img.getexif() if hasattr(img, 'getexif') else None
+        exif = img.getexif() if hasattr(img, "getexif") else None
 
         if not exif:
             return img
@@ -365,28 +364,22 @@ class Gallerist:
         if orientation_key in exif:
             orientation = exif[orientation_key]
 
-            rotate_values = {
-                3: 180,
-                6: 270,
-                8: 90
-            }
+            rotate_values = {3: 180, 6: 270, 8: 90}
 
             if orientation in rotate_values:
                 return img.rotate(rotate_values[orientation], expand=True)
         return img
 
     def _verify_mode_and_rotation(self, image: Image):
-        if image.format == 'GIF':
+        if image.format == "GIF":
             return image
 
-        if image.mode == 'CMYK':
-            image = image.convert('RGB')
+        if image.mode == "CMYK":
+            image = image.convert("RGB")
 
         return self.auto_rotate(image)
 
-    def resize_to_max_side(self,
-                           image: Image,
-                           desired_max_side: int) -> ImageWrapper:
+    def resize_to_max_side(self, image: Image, desired_max_side: int) -> ImageWrapper:
         width, height = image.size
 
         max_side = max(width, height)
@@ -406,11 +399,13 @@ class Gallerist:
             other_side = width / ratio
             sc = (int(other_side), desired_max_side)
 
-        if getattr(image, 'n_frames', 1) == 1:
+        if getattr(image, "n_frames", 1) == 1:
             # single frame image
             return ImageWrapper(image.resize(sc, Image.ANTIALIAS))
 
-        return ImageWrapper.from_frames([frame.resize(sc, Image.BOX) for frame in ImageSequence.Iterator(image)])
+        return ImageWrapper.from_frames(
+            [frame.resize(sc, Image.BOX) for frame in ImageSequence.Iterator(image)]
+        )
 
     def process_image(self, source_image_path: str):
         if not isinstance(self.store, SyncFileStore):
@@ -422,33 +417,35 @@ class Gallerist:
             raise SourceImageNotFoundError()
 
         image = self.parse_image(data)
-        image_format = self.get_format(image, self.format_by_extension(source_image_path) or 'JPEG')
+        image_format = self.get_format(
+            image, self.format_by_extension(source_image_path) or "JPEG"
+        )
 
         metadata = self._generate_images(image, image_format)
 
         image.close()
         return metadata
 
-    def get_image_name(self,
-                       version: ImageVersion,
-                       image_format: ImageFormat):
-        return f'{version.size_name[0]}-{version.id}{image_format.extension}'
+    def get_image_name(self, version: ImageVersion, image_format: ImageFormat):
+        return f"{version.size_name[0]}-{version.id}{image_format.extension}"
 
     def format_by_extension(self, image_path):
         extension = get_file_extension(image_path).lower()
 
-        if extension == '.jpg' or extension == '.jpeg':
-            return 'JPEG'
-        if extension == '.png':
-            return 'PNG'
-        if extension == '.gif':
-            return 'GIF'
+        if extension == ".jpg" or extension == ".jpeg":
+            return "JPEG"
+        if extension == ".png":
+            return "PNG"
+        if extension == ".gif":
+            return "GIF"
         return None
 
-    async def process_image_async(self,
-                                  source_image_path: str,
-                                  loop: Optional[AbstractEventLoop] = None,
-                                  executor=None):
+    async def process_image_async(
+        self,
+        source_image_path: str,
+        loop: Optional[AbstractEventLoop] = None,
+        executor=None,
+    ):
         if not isinstance(self.store, FileStore):
             raise ExpectedAsyncStoreError()
 
@@ -461,37 +458,42 @@ class Gallerist:
             raise SourceImageNotFoundError()
 
         image = self.parse_image(data)
-        image_format = self.get_format(image, self.format_by_extension(source_image_path) or 'JPEG')
+        image_format = self.get_format(
+            image, self.format_by_extension(source_image_path) or "JPEG"
+        )
 
-        metadata = await self._generate_images_async(image, image_format, loop, executor)
+        metadata = await self._generate_images_async(
+            image, image_format, loop, executor
+        )
 
         image.close()
         return metadata
 
-    async def _generate_images_async(self,
-                                     image: Image,
-                                     image_format: ImageFormat,
-                                     loop: AbstractEventLoop,
-                                     executor) -> ImageMetadata:
+    async def _generate_images_async(
+        self, image: Image, image_format: ImageFormat, loop: AbstractEventLoop, executor
+    ) -> ImageMetadata:
         metadata = self.get_metadata(image, image_format)
 
         for version in self.get_versions(image_format.mime):
             image_name = self.get_image_name(version, image_format)
             version.file_name = image_name
             metadata.versions.append(version)
-            resized_image = await loop.run_in_executor(executor, self.resize_to_max_side, image, version.max_side)
+            resized_image = await loop.run_in_executor(
+                executor, self.resize_to_max_side, image, version.max_side
+            )
             resized_image.format = image_format.name
 
-            await self.store.write_file(image_name,
-                                        image_format.to_bytes(resized_image),
-                                        FileInfo(image_format.mime,
-                                                 image_format.extension))
+            await self.store.write_file(
+                image_name,
+                image_format.to_bytes(resized_image),
+                FileInfo(image_format.mime, image_format.extension),
+            )
 
         return metadata
 
-    def _generate_images(self,
-                         image: Image,
-                         image_format: ImageFormat) -> ImageMetadata:
+    def _generate_images(
+        self, image: Image, image_format: ImageFormat
+    ) -> ImageMetadata:
         metadata = self.get_metadata(image, image_format)
 
         for version in self.get_versions(image_format.mime):
@@ -501,16 +503,18 @@ class Gallerist:
             resized_image = self.resize_to_max_side(image, version.max_side)
             resized_image.format = image_format.name
 
-            self.store.write_file(image_name,
-                                  image_format.to_bytes(resized_image),
-                                  FileInfo(image_format.mime,
-                                           image_format.extension))
+            self.store.write_file(
+                image_name,
+                image_format.to_bytes(resized_image),
+                FileInfo(image_format.mime, image_format.extension),
+            )
 
         return metadata
 
     def get_versions(self, image_mime: str) -> Generator[ImageVersion, None, None]:
         """
-        Returns versions to be generated for a given image mime, new ids are assigned here.
+        Returns versions to be generated for a given image mime,
+        new ids are assigned here.
 
         :param image_mime: mime type.
         :return: a sequence of ImageVersion
@@ -523,14 +527,9 @@ class Gallerist:
         image = self._verify_mode_and_rotation(image)
         return image
 
-    def get_metadata(self,
-                     image: Image,
-                     image_format: ImageFormat):
+    def get_metadata(self, image: Image, image_format: ImageFormat):
         width, height = image.size
 
-        return ImageMetadata(width,
-                             height,
-                             image_format.extension,
-                             image_format.mime,
-                             [])
-
+        return ImageMetadata(
+            width, height, image_format.extension, image_format.mime, []
+        )

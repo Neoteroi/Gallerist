@@ -1,17 +1,23 @@
 [![Build Status](https://dev.azure.com/robertoprevato/Nest/_apis/build/status/RobertoPrevato.Gallerist?branchName=master)](https://dev.azure.com/robertoprevato/Nest/_build/latest?definitionId=26&branchName=master) [![pypi](https://img.shields.io/pypi/v/Gallerist.svg?color=blue)](https://pypi.org/project/Gallerist/)
 
 # Gallerist
-Classes and methods to handle pictures for the web, using [Pillow](https://pillow.readthedocs.io).
+Classes and methods to handle pictures for the web, using
+[Pillow](https://pillow.readthedocs.io).
 
 ```bash
 $ pip install gallerist
 ```
 
 ## Features
-* Code api to handle the generation of pictures in various sizes (e.g. medium size picture, small size, thumbnail)
+* Code api to handle the generation of pictures in various sizes (e.g. medium
+  size picture, small size, thumbnail)
 * Both asynchronous api and synchronous api
-* Supports user defined stores for binaries, for example to read and write files in [Azure Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/), or [AWS S3](https://aws.amazon.com/s3/)
-* Handles by default JPG, PNG, GIF, MPO; and provides a code api to support adding more supported formats
+* Supports user defined stores for binaries, for example to read and write
+  files in [Azure Blob
+  Storage](https://azure.microsoft.com/en-us/services/storage/blobs/), or [AWS
+  S3](https://aws.amazon.com/s3/)
+* Handles by default JPG, PNG, GIF, MPO; and provides a code api to support
+  adding more supported formats
 * Supports scaling animated GIF files (resized gifs are still animated)
 * Maintains PNG transparencies
 
