@@ -6,10 +6,6 @@ store = FileSystemSyncFileStore("tests")
 
 gallerist = Gallerist(store)
 
-
-metadata = gallerist.process_image("files/blacksheep.png")
-
-
 # configuring sizes by mime (use '*' to match any other mime):
 gallerist = Gallerist(
     store,
