@@ -1,4 +1,8 @@
-[![Build Status](https://dev.azure.com/robertoprevato/Nest/_apis/build/status/RobertoPrevato.Gallerist?branchName=master)](https://dev.azure.com/robertoprevato/Nest/_build/latest?definitionId=26&branchName=master) [![pypi](https://img.shields.io/pypi/v/Gallerist.svg?color=blue)](https://pypi.org/project/Gallerist/)
+[![Build](https://github.com/Neoteroi/Gallerist/actions/workflows/build.yml/badge.svg)](https://github.com/Neoteroi/Gallerist/actions/workflows/build.yml)
+[![pypi](https://img.shields.io/pypi/v/gallerist.svg)](https://pypi.python.org/pypi/gallerist)
+[![versions](https://img.shields.io/pypi/pyversions/gallerist.svg)](https://github.com/Neoteroi/gallerist)
+[![codecov](https://codecov.io/gh/Neoteroi/Gallerist/branch/main/graph/badge.svg?token=oiCOiKgSbm)](https://codecov.io/gh/Neoteroi/Gallerist)
+[![license](https://img.shields.io/github/license/Neoteroi/gallerist.svg)](https://github.com/Neoteroi/gallerist/blob/main/LICENSE)
 
 # Gallerist
 Classes and methods to handle pictures for the web, using
@@ -20,6 +24,10 @@ $ pip install gallerist
   adding more supported formats
 * Supports scaling animated GIF files (resized gifs are still animated)
 * Maintains PNG transparencies
+
+## See also
+* [Gallerist Azure Storage Blob Service integration](https://github.com/Neoteroi/Gallerist-AzureStorage)
+* [Gallerist Azure Functions integration](https://github.com/Neoteroi/Gallerist-AzureFunctions)
 
 ## Examples
 Basic example using the synchronous api, and reading files from file system:
