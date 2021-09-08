@@ -28,7 +28,7 @@ setup(
     keywords="pictures images web",
     license="MIT",
     packages=["gallerist"],
-    install_requires=["aiofiles==0.4.0", "Pillow==8.1.2"],
+    install_requires=["aiofiles==0.4.0", "Pillow==8.3.2"],
     include_package_data=True,
     zip_safe=False,
 )
