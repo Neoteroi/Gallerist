@@ -8,7 +8,7 @@ def readme():
 
 setup(
     name="gallerist",
-    version="0.0.5",
+    version="0.0.6",
     description="Classes and methods to handle pictures for the web",
     long_description=readme(),
     long_description_content_type="text/markdown",
@@ -20,6 +20,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
         "Operating System :: OS Independent",
     ],
     url="https://github.com/Neoteroi/Gallerist",
@@ -28,7 +29,7 @@ setup(
     keywords="pictures images web",
     license="MIT",
     packages=["gallerist"],
-    install_requires=["aiofiles==0.4.0", "Pillow==8.3.2"],
+    install_requires=["aiofiles>=0.4.0", "Pillow>=8.3.2"],
     include_package_data=True,
     zip_safe=False,
 )
